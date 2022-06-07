@@ -20,7 +20,9 @@ export function useAppData(chainId?: SupportedChainId, trade?: TradeGp): AppData
   // AppDataInfo, from Jotai
   const [appDataInfo, setAppDataInfo] = useAtom(appDataInfoAtom)
   // Referrer address, from Redux
-  const { value: referrer, isValid: isReferrerValid } = useReferralAddress() || {}
+  const referrer = useReferralAddress()
+  // De-normalizing as we only care about the address if it's set, valid and active
+  const referrerAccount = referrer?.value && referrer?.isActive && referrer?.isValid ? referrer.value : undefined
   // AppCode is dynamic and based on how it's loaded (if used as a Gnosis Safe app)
   const appCode = useAppCode()
 
@@ -37,16 +39,9 @@ export function useAppData(chainId?: SupportedChainId, trade?: TradeGp): AppData
 
     const updateAppData = async (): Promise<void> => {
       try {
-        const { doc, calculatedAppData } = await buildAppData(
-          chainId,
-          sellAmount,
-          buyAmount,
-          referrer,
-          isReferrerValid,
-          appCode
-        )
+        const { doc, calculatedAppData } = await buildAppData(chainId, sellAmount, buyAmount, referrerAccount, appCode)
 
-        console.debug(`[useAppDataHash] appDataInfo`, JSON.stringify(doc), calculatedAppData)
+        console.debug(`[useAppData] appDataInfo`, JSON.stringify(doc), calculatedAppData)
 
         if (calculatedAppData?.appDataHash) {
           setAppDataInfo({ doc, hash: calculatedAppData.appDataHash })
@@ -55,13 +50,13 @@ export function useAppData(chainId?: SupportedChainId, trade?: TradeGp): AppData
           throw new Error("Couldn't calculate appDataHash")
         }
       } catch (e) {
-        console.error(`[useAppDataHash] failed to generate appData, falling back to default`, e.message)
+        console.error(`[useAppData] failed to generate appData, falling back to default`, e.message)
         setAppDataInfo({ hash: APP_DATA_HASH })
       }
     }
 
     updateAppData()
-  }, [appCode, buyAmount, chainId, isReferrerValid, referrer, sellAmount, setAppDataInfo])
+  }, [appCode, buyAmount, chainId, referrerAccount, sellAmount, setAppDataInfo])
 
   return appDataInfo
 }
